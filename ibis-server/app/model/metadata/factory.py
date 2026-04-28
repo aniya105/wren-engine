@@ -21,6 +21,7 @@ from app.model.metadata.redshift import RedshiftMetadata
 from app.model.metadata.snowflake import SnowflakeMetadata
 from app.model.metadata.spark import SparkMetadata
 from app.model.metadata.trino import TrinoMetadata
+from app.model.metadata.vertica import VerticaMetadata
 
 mapping = {
     DataSource.athena: AthenaMetadata,
@@ -42,6 +43,7 @@ mapping = {
     DataSource.databricks: DatabricksMetadata,
     DataSource.spark: SparkMetadata,
     DataSource.duckdb: DuckDBMetadata,
+    DataSource.vertica: VerticaMetadata,
 }
 
 

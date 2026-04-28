@@ -30,6 +30,7 @@ import psycopg
 import pyarrow as pa
 import sqlglot.expressions as sge
 import trino
+import vertica_python
 from databricks import sql as dbsql
 from databricks.sdk.core import Config as DbConfig
 from databricks.sdk.core import oauth_service_principal
@@ -225,6 +226,8 @@ class Connector:
             self._connector = DorisConnector(connection_info)
         elif data_source == DataSource.oracle:
             self._connector = OracleConnector(connection_info)
+        elif data_source == DataSource.vertica:
+            self._connector = VerticaConnector(connection_info)
         else:
             self._connector = IbisConnector(data_source, connection_info)
 
@@ -256,6 +259,13 @@ class Connector:
                 ) from e
             raise e
         except oracledb.DatabaseError as e:
+            raise WrenError(
+                ErrorCode.INVALID_SQL,
+                str(e),
+                phase=ErrorPhase.SQL_EXECUTION,
+                metadata={DIALECT_SQL: sql},
+            ) from e
+        except vertica_python.errors.Error as e:
             raise WrenError(
                 ErrorCode.INVALID_SQL,
                 str(e),
@@ -298,6 +308,13 @@ class Connector:
                 ) from e
             raise
         except oracledb.DatabaseError as e:
+            raise WrenError(
+                ErrorCode.INVALID_SQL,
+                str(e),
+                phase=ErrorPhase.SQL_DRY_RUN,
+                metadata={DIALECT_SQL: sql},
+            ) from e
+        except vertica_python.errors.Error as e:
             raise WrenError(
                 ErrorCode.INVALID_SQL,
                 str(e),
@@ -1029,3 +1046,31 @@ class DatabricksConnector(ConnectorABC):
             self.connection.close()
         except Exception as e:
             logger.warning(f"Error closing Databricks connection: {e}")
+
+
+class VerticaConnector(ConnectorABC):
+    def __init__(self, connection_info):
+        self.connection = DataSource.vertica.get_connection(connection_info)
+
+    @tracer.start_as_current_span("connector_query", kind=trace.SpanKind.CLIENT)
+    def query(self, sql: str, limit: int | None = None) -> pa.Table:
+        with closing(self.connection.cursor()) as cursor:
+            cursor.execute(sql)
+            cols = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
+            df = pd.DataFrame(rows, columns=cols)
+            if limit is not None:
+                df = df.head(limit)
+            return pa.Table.from_pandas(df)
+
+    @tracer.start_as_current_span("connector_dry_run", kind=trace.SpanKind.CLIENT)
+    def dry_run(self, sql: str) -> None:
+        with closing(self.connection.cursor()) as cursor:
+            cursor.execute(f"SELECT * FROM ({sql}) AS sub LIMIT 0")
+
+    def close(self) -> None:
+        """Close the Vertica connection."""
+        try:
+            self.connection.close()
+        except Exception as e:
+            logger.warning(f"Error closing Vertica connection: {e}")

@@ -99,6 +99,10 @@ class QueryTrinoDTO(QueryDTO):
     connection_info: ConnectionUrl | TrinoConnectionInfo = connection_info_field
 
 
+class QueryVerticaDTO(QueryDTO):
+    connection_info: VerticaConnectionInfo = connection_info_field
+
+
 class QueryLocalFileDTO(QueryDTO):
     connection_info: LocalFileConnectionInfo = connection_info_field
 
@@ -585,6 +589,26 @@ class TrinoConnectionInfo(BaseConnectionInfo):
     )
 
 
+class VerticaConnectionInfo(BaseConnectionInfo):
+    host: SecretStr = Field(
+        description="the hostname of your database", examples=["localhost"]
+    )
+    port: SecretPort = Field(description="the port of your database", examples=["5433"])
+    database: SecretStr = Field(
+        description="the database name of your database", examples=["mydb"]
+    )
+    user: SecretStr = Field(
+        description="the username of your database", examples=["dbadmin"]
+    )
+    password: SecretStr | None = Field(
+        description="the password of your database", examples=["password"], default=None
+    )
+    kwargs: dict[str, str] | None = Field(
+        description="Additional keyword arguments to pass to the vertica_python connection.",
+        default=None,
+    )
+
+
 class LocalFileConnectionInfo(BaseConnectionInfo):
     url: SecretStr = Field(
         description="the root path of the local file", default="/", examples=["/data"]
@@ -690,6 +714,7 @@ ConnectionInfo = (
     | SparkConnectionInfo
     | DatabricksTokenConnectionInfo
     | TrinoConnectionInfo
+    | VerticaConnectionInfo
     | LocalFileConnectionInfo
     | S3FileConnectionInfo
     | MinioFileConnectionInfo
