@@ -4,6 +4,7 @@ from opentelemetry import trace
 from sqlglot import exp, parse_one
 from sqlglot.optimizer.scope import build_scope
 
+from app.custom_sqlglot.dialects import vertica  # noqa: F401
 from app.model.data_source import DataSource
 from app.model.error import ErrorCode, ErrorPhase, WrenError
 from app.util import base64_to_dict

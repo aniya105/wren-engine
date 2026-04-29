@@ -99,6 +99,8 @@ class Rewriter:
             DataSource.gcs_file,
         }:
             return "duckdb"
+        elif data_source == DataSource.vertica:
+            return "postgres"
         return data_source.name
 
 

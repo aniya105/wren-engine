@@ -133,6 +133,8 @@ class Task:
             DataSource.gcs_file,
         }:
             return "duckdb"
+        elif self.context.data_source == DataSource.vertica:
+            return "postgres"
         return self.context.data_source.name
 
     def dry_run(self):
