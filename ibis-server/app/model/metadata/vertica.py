@@ -101,11 +101,17 @@ class VerticaMetadata(Metadata):
                     primaryKey="",
                 )
 
+            is_nullable = row_dict["is_nullable"]
+            not_null = (
+                not is_nullable
+                if isinstance(is_nullable, bool)
+                else is_nullable.lower() == "no"
+            )
             unique_tables[schema_table].columns.append(
                 Column(
                     name=row_dict["column_name"],
                     type=self._transform_vertica_column_type(row_dict["data_type"]),
-                    notNull=row_dict["is_nullable"].lower() == "no",
+                    notNull=not_null,
                     description=None,
                     properties=None,
                 )
@@ -160,7 +166,8 @@ class VerticaMetadata(Metadata):
     def _transform_vertica_column_type(
         self, data_type: str
     ) -> RustWrenEngineColumnType:
-        normalized_type = data_type.lower()
+        # Strip parameters like varchar(18) -> varchar
+        normalized_type = data_type.lower().split("(")[0].strip()
         mapped_type = VERTICA_TYPE_MAPPING.get(
             normalized_type, RustWrenEngineColumnType.UNKNOWN
         )
