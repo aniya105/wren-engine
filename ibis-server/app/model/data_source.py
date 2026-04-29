@@ -52,6 +52,7 @@ from app.model import (
     QuerySnowflakeDTO,
     QuerySparkDTO,
     QueryTrinoDTO,
+    QueryVerticaDTO,
     RedshiftConnectionInfo,
     RedshiftIAMConnectionInfo,
     S3FileConnectionInfo,
@@ -59,6 +60,7 @@ from app.model import (
     SparkConnectionInfo,
     SSLMode,
     TrinoConnectionInfo,
+    VerticaConnectionInfo,
 )
 from app.model.error import ErrorCode, WrenError
 
@@ -85,6 +87,7 @@ class DataSource(StrEnum):
     duckdb = auto()
     spark = auto()
     databricks = auto()
+    vertica = auto()
 
     def get_connection(self, info: ConnectionInfo) -> BaseBackend:
         try:
@@ -205,6 +208,8 @@ class DataSource(StrEnum):
                 ):
                     return DatabricksServicePrincipalConnectionInfo.model_validate(data)
                 return DatabricksTokenConnectionInfo.model_validate(data)
+            case DataSource.vertica:
+                return VerticaConnectionInfo.model_validate(data)
             case _:
                 raise NotImplementedError(f"Unsupported data source: {self}")
 
@@ -258,6 +263,7 @@ class DataSourceExtension(Enum):
     gcs_file = QueryGcsFileDTO
     databricks = QueryDatabricksDTO
     spark = QuerySparkDTO
+    vertica = QueryVerticaDTO
 
     def __init__(self, dto: QueryDTO):
         self.dto = dto
@@ -525,6 +531,19 @@ class DataSourceExtension(Enum):
             server_hostname=info.server_hostname.get_secret_value(),
             http_path=info.http_path.get_secret_value(),
             access_token=info.access_token.get_secret_value(),
+        )
+
+    @staticmethod
+    def get_vertica_connection(info: VerticaConnectionInfo):
+        import vertica_python
+
+        return vertica_python.connect(
+            host=info.host.get_secret_value(),
+            port=int(info.port.get_secret_value()),
+            database=info.database.get_secret_value(),
+            user=info.user.get_secret_value(),
+            password=info.password.get_secret_value() if info.password else "",
+            **(info.kwargs if info.kwargs else {}),
         )
 
     @staticmethod
