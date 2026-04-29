@@ -158,6 +158,12 @@ class DataSource(StrEnum):
                         data.get("connectionUrl", data.get("connection_url"))
                     )
                 )
+            if self == DataSource.vertica:
+                return self._handle_vertica_url(
+                    urllib.parse.urlparse(
+                        data.get("connectionUrl", data.get("connection_url"))
+                    )
+                )
             return ConnectionUrl.model_validate(data)
 
         match self:
@@ -241,6 +247,30 @@ class DataSource(StrEnum):
 
     def _safe_strtobool(self, val: str) -> bool:
         return val.lower() in {"1", "true", "yes", "y"}
+
+    def _handle_vertica_url(
+        self, parsed: urllib.parse.ParseResult
+    ) -> VerticaConnectionInfo:
+        if not parsed.scheme or parsed.scheme != "vertica":
+            raise WrenError(
+                ErrorCode.INVALID_CONNECTION_INFO,
+                "Invalid connection URL for Vertica",
+            )
+        kwargs = {}
+        if parsed.username:
+            kwargs["user"] = parsed.username
+        if parsed.password:
+            kwargs["password"] = urllib.parse.unquote_plus(parsed.password)
+        if parsed.hostname:
+            kwargs["host"] = parsed.hostname
+        if parsed.port:
+            kwargs["port"] = str(parsed.port)
+        if database := parsed.path[1:]:
+            kwargs["database"] = database
+        parsed_kwargs = dict(urllib.parse.parse_qsl(parsed.query))
+        if parsed_kwargs:
+            kwargs["kwargs"] = parsed_kwargs
+        return VerticaConnectionInfo(**kwargs)
 
 
 class DataSourceExtension(Enum):
