@@ -7,6 +7,7 @@ from loguru import logger
 from opentelemetry import trace
 
 from app.config import get_config
+from app.custom_sqlglot.dialects.vertica import Vertica
 from app.custom_sqlglot.dialects.wren import Wren
 from app.dependencies import X_WREN_VARIABLE_PREFIX
 from app.mdl.core import (
@@ -100,7 +101,7 @@ class Rewriter:
         }:
             return "duckdb"
         elif data_source == DataSource.vertica:
-            return "postgres"
+            return Vertica()
         return data_source.name
 
 
