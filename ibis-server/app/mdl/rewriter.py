@@ -87,7 +87,8 @@ class Rewriter:
 
     @classmethod
     def _get_read_dialect(cls, experiment) -> str | sqlglot.Dialect:
-        return Wren if experiment else "trino"
+        # Use "trino" for experiment, or None for generic parsing
+        return Wren if experiment else None
 
     @classmethod
     def _get_write_dialect(cls, data_source: DataSource) -> str:
