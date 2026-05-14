@@ -60,6 +60,43 @@ class VerticaMetadata(Metadata):
         self.connection = DataSource.vertica.get_connection(connection_info)
 
     def get_table_list(self) -> list[Table]:
+        # Get column and table comments from v_catalog.comments
+        # The table structure is:
+        # - object_schema: schema name (e.g., "biz_test")
+        # - object_name: table name (e.g., "t_test")
+        # - child_object: column name (for COLUMN type) or NULL (for TABLE type)
+        # - comment: the comment text
+        comments_sql = """
+        SELECT
+            object_schema,
+            object_name,
+            object_type,
+            child_object,
+            comment
+        FROM v_catalog.comments
+        WHERE object_type IN ('COLUMN', 'TABLE')
+        """
+        column_comments = {}
+        table_comments = {}
+        with self.connection.cursor() as cursor:
+            cursor.execute(comments_sql)
+            for row in cursor.fetchall():
+                # row[0] = object_schema, row[1] = object_name, row[2] = object_type
+                # row[3] = child_object (column name for COLUMN type), row[4] = comment
+                schema_name = row[0]
+                table_name = row[1]
+                object_type = row[2]
+                child_object = row[3]
+                comment_text = row[4]
+                key = (schema_name, table_name)
+
+                if object_type == 'COLUMN':
+                    if key not in column_comments:
+                        column_comments[key] = {}
+                    column_comments[key][child_object] = comment_text
+                elif object_type == 'TABLE':
+                    table_comments[key] = comment_text
+
         sql = """
         SELECT
             t.table_schema,
@@ -89,9 +126,13 @@ class VerticaMetadata(Metadata):
             )
 
             if schema_table not in unique_tables:
+                # Get table comment if available
+                table_key = (row_dict["table_schema"], row_dict["table_name"])
+                table_desc = table_comments.get(table_key)
+
                 unique_tables[schema_table] = Table(
                     name=schema_table,
-                    description=None,
+                    description=table_desc,
                     columns=[],
                     properties=TableProperties(
                         schema=row_dict["table_schema"],
@@ -107,12 +148,19 @@ class VerticaMetadata(Metadata):
                 if isinstance(is_nullable, bool)
                 else is_nullable.lower() == "no"
             )
+
+            # Get column comment if available
+            col_comment = None
+            col_key = (row_dict["table_schema"], row_dict["table_name"])
+            if col_key in column_comments:
+                col_comment = column_comments[col_key].get(row_dict["column_name"])
+
             unique_tables[schema_table].columns.append(
                 Column(
                     name=row_dict["column_name"],
                     type=self._transform_vertica_column_type(row_dict["data_type"]),
                     notNull=not_null,
-                    description=None,
+                    description=col_comment,
                     properties=None,
                 )
             )
